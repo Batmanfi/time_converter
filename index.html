@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IST-Sweden Time Converter</title>
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        #root {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #1f2937;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const TimeZoneConverter = () => {
+            const [isDarkMode, setIsDarkMode] = React.useState(true);
+            const [istTime, setIstTime] = React.useState('');
+            const [swedenTime, setSwedenTime] = React.useState('');
+            const [currentISTTime, setCurrentISTTime] = React.useState('');
+            const [currentSwedenTime, setCurrentSwedenTime] = React.useState('');
+            const [activeTab, setActiveTab] = React.useState('ist-to-sweden');
+
+            // Update current times every second
+            React.useEffect(() => {
+                const updateCurrentTimes = () => {
+                    const now = new Date();
+                    
+                    // For IST (UTC+5:30)
+                    const istOptions = {
+                        timeZone: 'Asia/Kolkata',
+                        hour12: true,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    };
+                    
+                    // For Sweden (CET/CEST - UTC+1/UTC+2)
+                    const swedenOptions = {
+                        timeZone: 'Europe/Stockholm',
+                        hour12: true,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    };
+                    
+                    setCurrentISTTime(now.toLocaleTimeString('en-US', istOptions));
+                    setCurrentSwedenTime(now.toLocaleTimeString('en-US', swedenOptions));
+                };
+                
+                updateCurrentTimes();
+                const timer = setInterval(updateCurrentTimes, 1000);
+                
+                return () => clearInterval(timer);
+            }, []);
+
+            const handleISTChange = (e) => {
+                const istValue = e.target.value;
+                setIstTime(istValue);
+                
+                if (istValue) {
+                    // Parse the time (assuming format like "14:30")
+                    const [hours, minutes] = istValue.split(':').map(Number);
+                    
+                    // Create Date object with today's date and the given time in IST
+                    const date = new Date();
+                    // IST is UTC+5:30, set time in UTC
+                    date.setUTCHours(hours - 5, minutes - 30, 0);
+                    
+                    // Convert to Sweden time (UTC+1/+2 depending on DST)
+                    const swedenDate = new Date(date);
+                    // Adjust for Sweden timezone - handled automatically by toLocaleTimeString
+                    const swedenTimeValue = swedenDate.toLocaleTimeString('en-GB', {
+                        timeZone: 'Europe/Stockholm',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                    
+                    setSwedenTime(swedenTimeValue);
+                } else {
+                    setSwedenTime('');
+                }
+            };
+
+            const handleSwedenChange = (e) => {
+                const swedenValue = e.target.value;
+                setSwedenTime(swedenValue);
+                
+                if (swedenValue) {
+                    // Parse the time
+                    const [hours, minutes] = swedenValue.split(':').map(Number);
+                    
+                    // Create Date object with today's date and the given time in Sweden
+                    const date = new Date();
+                    
+                    // Sweden is UTC+1/+2 (depending on DST), but we'll use the timezone API to handle this complexity
+                    // First, set the time in UTC
+                    const swedenDate = new Date();
+                    swedenDate.setHours(hours, minutes, 0);
+                    
+                    // Convert Sweden time to UTC time
+                    const swedenTime = new Date(swedenDate.toLocaleString('en-US', {timeZone: 'Europe/Stockholm'}));
+                    const utcTime = new Date(swedenDate.toLocaleString('en-US', {timeZone: 'UTC'}));
+                    const offset = (swedenTime - utcTime) / (60 * 60 * 1000);
+                    
+                    // Apply the offset to calculate IST (UTC+5:30)
+                    const istDate = new Date(date);
+                    istDate.setUTCHours(hours - offset + 5, minutes + 30, 0);
+                    
+                    const istTimeValue = istDate.toLocaleTimeString('en-GB', {
+                        timeZone: 'Asia/Kolkata',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                    
+                    setIstTime(istTimeValue);
+                } else {
+                    setIstTime('');
+                }
+            };
+
+            const toggleDarkMode = () => {
+                setIsDarkMode(!isDarkMode);
+                // Update body background color based on dark mode
+                document.body.style.backgroundColor = isDarkMode ? '#ffffff' : '#1f2937';
+                document.getElementById('root').style.backgroundColor = isDarkMode ? '#ffffff' : '#1f2937';
+            };
+
+            // Get time difference between IST and Sweden
+            const getTimeDifference = () => {
+                const now = new Date();
+                
+                // IST is UTC+5:30
+                const istOffset = 5.5 * 60;
+                
+                // Sweden (Stockholm) uses CEST (UTC+2) in summer and CET (UTC+1) in winter
+                const swedenDate = new Date(now.toLocaleString('en-US', {timeZone: 'Europe/Stockholm'}));
+                const utcDate = new Date(now.toLocaleString('en-US', {timeZone: 'UTC'}));
+                const swedenOffset = (swedenDate - utcDate) / (60 * 1000);
+                
+                // Calculate difference in minutes
+                const diffMinutes = istOffset - swedenOffset;
+                
+                // Convert to hours and minutes
+                const hours = Math.floor(Math.abs(diffMinutes) / 60);
+                const minutes = Math.abs(diffMinutes) % 60;
+                
+                return `${diffMinutes >= 0 ? '+' : '-'}${hours}:${minutes === 0 ? '00' : minutes}`;
+            };
+
+            return (
+                <div className={`max-w-md mx-auto p-6 rounded-lg shadow-lg ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}`}>
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-bold">IST ⟷ Sweden Time</h1>
+                        <button 
+                            onClick={toggleDarkMode} 
+                            className={`p-2 rounded-full ${isDarkMode ? 'bg-gray-700 text-yellow-300' : 'bg-gray-200 text-gray-800'}`}
+                        >
+                            {isDarkMode ? '☀️' : '🌙'}
+                        </button>
+                    </div>
+                    
+                    <div className="mb-4">
+                        <div className="flex border-b">
+                            <button 
+                                className={`px-4 py-2 w-1/2 ${activeTab === 'ist-to-sweden' ? (isDarkMode ? 'border-b-2 border-blue-400' : 'border-b-2 border-blue-600') : ''}`}
+                                onClick={() => setActiveTab('ist-to-sweden')}
+                            >
+                                IST → Sweden
+                            </button>
+                            <button 
+                                className={`px-4 py-2 w-1/2 ${activeTab === 'sweden-to-ist' ? (isDarkMode ? 'border-b-2 border-blue-400' : 'border-b-2 border-blue-600') : ''}`}
+                                onClick={() => setActiveTab('sweden-to-ist')}
+                            >
+                                Sweden → IST
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className={`space-y-6 ${activeTab === 'ist-to-sweden' ? 'block' : 'hidden'}`}>
+                        <div className={`p-4 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <label className="block mb-2 font-medium">IST Time (India)</label>
+                            <input 
+                                type="time" 
+                                value={istTime} 
+                                onChange={handleISTChange}
+                                className={`w-full p-2 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-800'} border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
+                            />
+                        </div>
+                        
+                        <div className="flex justify-center">
+                            <div className={`w-10 h-10 flex items-center justify-center rounded-full ${isDarkMode ? 'bg-blue-500' : 'bg-blue-600'}`}>
+                                ↓
+                            </div>
+                        </div>
+                        
+                        <div className={`p-4 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <label className="block mb-2 font-medium">Sweden Time</label>
+                            <input 
+                                type="time" 
+                                value={swedenTime}
+                                readOnly 
+                                className={`w-full p-2 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-800'} border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className={`space-y-6 ${activeTab === 'sweden-to-ist' ? 'block' : 'hidden'}`}>
+                        <div className={`p-4 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <label className="block mb-2 font-medium">Sweden Time</label>
+                            <input 
+                                type="time" 
+                                value={swedenTime} 
+                                onChange={handleSwedenChange}
+                                className={`w-full p-2 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-800'} border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
+                            />
+                        </div>
+                        
+                        <div className="flex justify-center">
+                            <div className={`w-10 h-10 flex items-center justify-center rounded-full ${isDarkMode ? 'bg-blue-500' : 'bg-blue-600'}`}>
+                                ↓
+                            </div>
+                        </div>
+                        
+                        <div className={`p-4 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                            <label className="block mb-2 font-medium">IST Time (India)</label>
+                            <input 
+                                type="time" 
+                                value={istTime}
+                                readOnly 
+                                className={`w-full p-2 rounded ${isDarkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-800'} border ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className={`mt-8 p-4 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <h2 className="text-lg font-semibold mb-2">Current Time</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-sm opacity-70">India (IST)</p>
+                                <p className="text-xl">{currentISTTime}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm opacity-70">Sweden</p>
+                                <p className="text-xl">{currentSwedenTime}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className={`mt-4 p-4 rounded-md ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                        <p className="text-center">
+                            Time difference: IST is {getTimeDifference()} hours from Sweden
+                        </p>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the component
+        ReactDOM.render(<TimeZoneConverter />, document.getElementById('root'));
+    </script>
+</body>
+</html>
